@@ -1,7 +1,34 @@
-from flask import Blueprint
+from flask import Blueprint, request, jsonify
+from ..extensions import db
+from app.models.website import Website
 
 website_bp = Blueprint("website", __name__)
 
 @website_bp.route("/urls", methods=["GET"])
-def urls():
-    return "urls route works"
+def website_urls():
+    websites = Website.query.all()
+
+    return jsonify([w.to_dict() for w in websites])
+
+@website_bp.route("/urls", methods=["POST"])
+def add_website():
+    data = request.get_json()
+    name = data["name"]
+    url = data["url"]
+
+    website = Website(name=name, url=url)
+    db.session.add(website)
+    db.session.commit()
+
+    return "Website created", 201
+
+
+@website_bp.route("/urls/<id>", methods=["DELETE"])
+def delete_website(id):
+    website = Website.query.get(id)
+    if website:
+        db.session.delete(website)
+        db.session.commit()
+        return "Website deleted", 204
+
+    return "Website not found", 404
