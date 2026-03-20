@@ -1,10 +1,8 @@
 from flask import Flask
+from app.routes.urls import demoBlue
 
 app = Flask(__name__)
-
-@app.route("/")
-def hello_world():
-    return "<p>Hello, World!</p>";
+app.register_blueprint(demoBlue)
 
 if __name__ == "__main__":
     app.run(debug=True)
