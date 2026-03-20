@@ -3,6 +3,8 @@ from ..extensions import db
 from sqlalchemy.orm import Mapped, mapped_column
 
 class Website(db.Model):
+    __tablename__ = "websites"
+
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str]
     url: Mapped[str] = mapped_column(unique=True)

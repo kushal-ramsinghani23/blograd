@@ -1,16 +1,15 @@
 from flask import Blueprint, request, jsonify
 from ..extensions import db
-from app.models.website import Website
+from ..models.website import Website
 
 website_bp = Blueprint("website", __name__)
 
-@website_bp.route("/urls", methods=["GET"])
-def website_urls():
+@website_bp.route("/websites", methods=["GET"])
+def get_all_websites():
     websites = Website.query.all()
-
     return jsonify([w.to_dict() for w in websites])
 
-@website_bp.route("/urls", methods=["POST"])
+@website_bp.route("/websites", methods=["POST"])
 def add_website():
     data = request.get_json()
     name = data["name"]
@@ -22,8 +21,7 @@ def add_website():
 
     return "Website created", 201
 
-
-@website_bp.route("/urls/<id>", methods=["DELETE"])
+@website_bp.route("/websites/<id>", methods=["DELETE"])
 def delete_website(id):
     website = Website.query.get(id)
     if website:
