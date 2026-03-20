@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from ..extensions import db
 from ..models.keyword import Keyword
+from ..services.keyword_service import validate_keyword
 
 keyword_bp = Blueprint("keyword", __name__)
 
@@ -12,6 +13,10 @@ def get_all_keywords():
 @keyword_bp.route("/keywords", methods=["POST"])
 def add_keyword():
     data = request.get_json()
+    is_valid, error = validate_keyword(data)
+    if not is_valid:
+        return error, 400
+
     word = data["word"]
     category = data["category"]
 

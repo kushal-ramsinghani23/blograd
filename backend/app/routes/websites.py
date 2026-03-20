@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from ..extensions import db
 from ..models.website import Website
+from ..services.website_service import validate_website
 
 website_bp = Blueprint("website", __name__)
 
@@ -12,6 +13,10 @@ def get_all_websites():
 @website_bp.route("/websites", methods=["POST"])
 def add_website():
     data = request.get_json()
+    is_valid, error = validate_website(data)
+    if not is_valid:
+        return error, 400
+
     name = data["name"]
     url = data["url"]
 

@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from ..extensions import db
 from ..models.draft import Draft
+from ..services.draft_service import validate_draft_update
 
 draft_bp = Blueprint("draft", __name__)
 
@@ -20,9 +21,14 @@ def get_draft_by_id(id):
 def update_draft(id):
     draft = Draft.query.filter_by(id=id).first()
     if draft:
+        is_valid, error = validate_draft_update(request.json)
+        if not is_valid:
+            return error, 400
+
         draft.title = request.json.get("title", draft.title)
         draft.content = request.json.get("content", draft.content)
         draft.status = request.json.get("status", draft.status)
+
         db.session.add(draft)
         db.session.commit()
         return "Draft Updated", 200
