@@ -488,9 +488,105 @@ No `POST /drafts` — drafts are created by the agent, not the user.
 
 ---
 
+## 10. Service Layer — Validation
+
+### Why a service layer?
+
+Routes handle HTTP in/out. Business logic — including validation — should never live in routes. It belongs in `services/`.
+
+This is the same thinking as Spring Boot: Controller → Service → Repository.
+
+```
+Route (HTTP) → Service (validation + logic) → DB
+```
+
+### The tuple pattern
+
+Every validation function returns a tuple `(is_valid, error_message)`:
+
+```python
+return False, "URL is not valid"   # failed
+return True, None                   # passed
+```
+
+The route consumes it cleanly:
+
+```python
+is_valid, error = validate_website(data)
+if not is_valid:
+    return error, 400
+```
+
+No if/else chains in routes. One line check, done.
+
+### `validate_website(data)`
+
+```python
+from urllib.parse import urlparse
+from ..models.website import Website
+
+def validate_website(data):
+    if not data.get("name"): return False, "Name is required"
+    if not data.get("url"): return False, "URL is required"
+
+    result = urlparse(data["url"])
+    if not result.scheme or not result.netloc:
+        return False, "URL is not valid"
+
+    existing = Website.query.filter_by(url=data["url"]).first()
+    if existing: return False, "URL already exists"
+
+    return True, None
+```
+
+Checks in order:
+1. Fields present and not empty — `.get()` handles both missing key and empty string
+2. URL format valid — `urlparse` splits into scheme + netloc, both must exist
+3. Duplicate check — query DB before inserting
+
+### `validate_keyword(data)`
+
+```python
+from ..models.keyword import Keyword
+
+def validate_keyword(data):
+    if not data.get("word"): return False, "Word is required"
+    if not data.get("category"): return False, "Category is required"
+
+    existing = Keyword.query.filter_by(word=data["word"]).first()
+    if existing: return False, "Keyword already exists"
+
+    return True, None
+```
+
+### `validate_draft_update(data)`
+
+```python
+def validate_draft_update(data):
+    if data.get("status") and data.get("status") not in ["draft", "approved", "published"]:
+        return False, "Status must be draft, approved, or published"
+
+    return True, None
+```
+
+Status is optional in PATCH — only validate it if it's actually present. The `and` short-circuits: if status is absent → first condition is falsy → skip second check.
+
+### What we deliberately skipped
+
+**URL reachability check** — using `requests.get(url)` to verify the site actually exists. Skipped because:
+- Adds latency to every POST request
+- Sites can be temporarily down but still valid
+- Timeout handling adds complexity
+- Not worth it for a student project
+
+Format validation is sufficient for now.
+
+---
+
 ## Commit History After Phase 1
 
 ```
+feat(backend): add service layer with input validation for Website, Keyword, and Draft resources
 feat(backend): add Draft model with CRUD endpoints
 feat(backend): add Keyword model with CRUD endpoints
 refactor(backend): split monolithic routes into resource-specific files and add tablenames to models
@@ -522,6 +618,9 @@ feat(backend): Flask skeleton setup with hello world route in run.py
 | `__tablename__` | Override auto-generated table name — use plural |
 | One file per resource | `websites.py`, `keywords.py`, `drafts.py` — not everything in one file |
 | PATCH vs PUT | PATCH = partial update, PUT = full replace |
+| `(is_valid, error)` tuple | Clean validation pattern — route does one check, returns error directly |
+| Validate `request.json` not model | Pass request data to validator, not the DB object |
+| `data.get("key")` vs `data["key"]` | `.get()` is safe — returns None if missing, no KeyError |
 
 ---
 
