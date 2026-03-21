@@ -2,7 +2,8 @@ from typing import TypedDict, List
 from urllib.parse import urlparse
 from langgraph.graph import StateGraph, START, END
 from bs4 import BeautifulSoup
-from langgraph.checkpoint.sqlite import SqliteSaver
+# from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.memory import MemorySaver
 
 import requests
 
@@ -35,17 +36,25 @@ def fetch_websites_and_keywords(state: ScraperState):
     }
 
 def crawl_blog_index(state: ScraperState):
-    pending_urls = []
+    pending_urls = set()
+
     for url in state["websites"]:
-        response = requests.get(url)
+        try:
+            response = requests.get(url, timeout=10)
+        except Exception:
+            continue
         html_doc = response.text
 
         soup = BeautifulSoup(html_doc, "html.parser")
         for link in soup.find_all("a"):
-            pending_urls.append(link.get("href"))
+            link_href = link.get("href")
+            if link_href and link_href.startswith("http"):
+                site_domain = urlparse(url).netloc
+                if urlparse(link_href).netloc == site_domain:
+                    pending_urls.add(link_href)
 
     return {
-        'pending_urls': pending_urls,
+        'pending_urls': list(pending_urls),
     }
 
 def check_dedup(state: ScraperState):
@@ -62,7 +71,14 @@ def scrape_article(state: ScraperState):
     pending_urls = state["pending_urls"]
     scraped_urls = state["scraped_urls"]
 
-    response = requests.get(pending_urls[0])
+    try:
+        response = requests.get(pending_urls[0], timeout=10)
+    except Exception:
+        # skip this URL, move on
+        return {
+            'pending_urls': pending_urls[1:],
+            'scraped_urls': scraped_urls + [pending_urls[0]],
+        }
     html_doc = response.text
     soup = BeautifulSoup(html_doc, "html.parser")
     current_article: ArticleState = {
@@ -120,7 +136,7 @@ def create_scraper_graph():
     builder.add_edge("check_dedup", "scrape_article")
     builder.add_edge("scrape_article", "match_keywords")
 
-    builder.add_conditional_edge("match_keywords", router_function, {"continue": "scrape_article", "end": END})
+    builder.add_conditional_edges("match_keywords", router_function, {"continue": "check_dedup", "end": END})
 
-    memory = SqliteSaver.from_conn_string("checkpoints.db")
+    memory = MemorySaver()
     return builder.compile(checkpointer=memory)
