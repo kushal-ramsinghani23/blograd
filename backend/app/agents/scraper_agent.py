@@ -58,11 +58,7 @@ def crawl_blog_index(state: ScraperState):
     }
 
 def check_dedup(state: ScraperState):
-    pending_urls = state["pending_urls"]
-    scraped_urls = state["scraped_urls"]
-
-    updated_pending_urls = [url for url in pending_urls if url not in scraped_urls]
-
+    updated_pending_urls = [url for url in state["pending_urls"] if url not in state["scraped_urls"]]
     return {
         'pending_urls': updated_pending_urls,
     }
@@ -136,7 +132,14 @@ def create_scraper_graph():
     builder.add_edge("check_dedup", "scrape_article")
     builder.add_edge("scrape_article", "match_keywords")
 
-    builder.add_conditional_edges("match_keywords", router_function, {"continue": "check_dedup", "end": END})
+    builder.add_conditional_edges(
+        "match_keywords",
+        router_function,
+        {
+            "continue": "check_dedup",
+            "end": END
+        }
+    )
 
     memory = MemorySaver()
     return builder.compile(checkpointer=memory)
