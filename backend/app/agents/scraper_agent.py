@@ -2,7 +2,6 @@ from typing import TypedDict, List
 from urllib.parse import urlparse
 from langgraph.graph import StateGraph, START, END
 from bs4 import BeautifulSoup
-# from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.checkpoint.memory import MemorySaver
 
 import requests
