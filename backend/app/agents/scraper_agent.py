@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 from langgraph.graph import StateGraph, START, END
 from bs4 import BeautifulSoup
 from langgraph.checkpoint.memory import MemorySaver
+from playwright.sync_api import sync_playwright
 
 import requests
 
@@ -39,7 +40,15 @@ def crawl_blog_index(state: ScraperState):
 
     for url in state["websites"]:
         try:
+            path = urlparse(url).path
+            if path == "" or path == "/":
+                url = url.rstrip("/") + "/blog"
+
             response = requests.get(url, timeout=10)
+            if response.status_code != 200:
+                # fallback to original URL without /blog
+                url = url.replace("/blog", "")
+                response = requests.get(url, timeout=10)
         except Exception:
             continue
         html_doc = response.text
@@ -76,9 +85,23 @@ def scrape_article(state: ScraperState):
         }
     html_doc = response.text
     soup = BeautifulSoup(html_doc, "html.parser")
+
+    content = soup.get_text(strip=True)
+    if len(content) < 500:  # too little content — probably JS-rendered
+        # fall back to Playwright
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page()
+            page.goto(pending_urls[0])
+            page.wait_for_load_state("networkidle")  # wait for JS to finish
+            content = page.content()  # get full rendered HTML
+            browser.close()
+
+    content_soup = BeautifulSoup(content, "html.parser")
+    text = content_soup.get_text(strip=True)
     current_article: ArticleState = {
         "url": pending_urls[0],
-        "text": soup.get_text(),
+        "text": text,
         "source_site": urlparse(pending_urls[0]).netloc,
         "matched_keywords": []
     }
