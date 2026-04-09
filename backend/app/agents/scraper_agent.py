@@ -134,6 +134,19 @@ def match_keywords(state: ScraperState):
 
     return {}
 
+def rank_articles(state: ScraperState):
+    matched_articles = state["matched_articles"]
+
+    def keyword_frequency(article: ArticleState) -> int:
+        return sum(
+            article["text"].count(keyword)
+            for keyword in article["matched_keywords"]
+        )
+
+    ranked = sorted(matched_articles, key=keyword_frequency, reverse=True)
+
+    return {"matched_articles": ranked}
+
 def router_function(state: ScraperState):
     if state["pending_urls"]:
         return "continue"
@@ -147,19 +160,21 @@ def create_scraper_graph():
     builder.add_node("check_dedup", check_dedup)
     builder.add_node("scrape_article", scrape_article)
     builder.add_node("match_keywords", match_keywords)
+    builder.add_node("rank_articles", rank_articles)
 
     builder.add_edge(START, "fetch_websites_and_keywords")
     builder.add_edge("fetch_websites_and_keywords", "crawl_blog_index")
     builder.add_edge("crawl_blog_index", "check_dedup")
     builder.add_edge("check_dedup", "scrape_article")
     builder.add_edge("scrape_article", "match_keywords")
+    builder.add_edge("rank_articles", END)
 
     builder.add_conditional_edges(
         "match_keywords",
         router_function,
         {
             "continue": "check_dedup",
-            "end": END
+            "end": "rank_articles"
         }
     )
 
