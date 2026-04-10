@@ -1,10 +1,15 @@
+import time
 from typing import TypedDict, List
 from urllib.parse import urlparse
+
+from langchain_groq import ChatGroq
 from langgraph.graph import StateGraph, START, END
 from bs4 import BeautifulSoup
 from langgraph.checkpoint.memory import MemorySaver
 from playwright.sync_api import sync_playwright
-
+import os
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 import requests
 
 from ..models.keyword import Keyword
@@ -16,6 +21,7 @@ class ArticleState(TypedDict):
     text: str
     source_site: str
     matched_keywords: List[str]
+    summary: str
 
 class ScraperState(TypedDict):
     websites: List[str]
@@ -87,18 +93,20 @@ def scrape_article(state: ScraperState):
     soup = BeautifulSoup(html_doc, "html.parser")
 
     content = soup.get_text(strip=True)
-    if len(content) < 500:  # too little content — probably JS-rendered
-        # fall back to Playwright
-        with sync_playwright() as p:
-            browser = p.chromium.launch()
-            page = browser.new_page()
-            page.goto(pending_urls[0])
-            page.wait_for_load_state("networkidle")  # wait for JS to finish
-            content = page.content()  # get full rendered HTML
-            browser.close()
-
-    content_soup = BeautifulSoup(content, "html.parser")
-    text = content_soup.get_text(strip=True)
+    text = content
+    if len(content) < 500:
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.launch()
+                page = browser.new_page()
+                page.goto(pending_urls[0], timeout=60000)
+                page.wait_for_load_state("domcontentloaded")
+                content = page.content()
+                browser.close()
+            soup = BeautifulSoup(content, "html.parser")
+            text = soup.get_text(strip=True)
+        except Exception:
+            text = content  # use whatever BS4 got, even if minimal
     current_article: ArticleState = {
         "url": pending_urls[0],
         "text": text,
@@ -147,6 +155,52 @@ def rank_articles(state: ScraperState):
 
     return {"matched_articles": ranked}
 
+def summarize_articles(state: ScraperState):
+    matched_articles = state["matched_articles"][:5]
+
+    # model = ChatGoogleGenerativeAI(
+    #     model="models/gemini-2.0-flash",
+    #     temperature=0.3,
+    #     google_api_key=os.getenv("GEMINI_API_KEY")
+    # )
+    model = ChatGroq(
+        model="llama-3.3-70b-versatile",
+        temperature=0.3,
+        max_tokens=500,
+        groq_api_key=os.getenv("GROQ_API_KEY")
+    )
+
+    summarized = []
+    for article in matched_articles:
+        messages = [
+            (
+                "system",
+                "You are a content analyst. Given a blog article, extract a structured summary."
+                "Respond in this exact format:\n"
+                "SUMMARY: (2-3 sentence summary of the article)\n"
+                "STYLE: (tone, structure, vocabulary level — 1-2 sentences)\n"
+                "KEY POINTS: (3-5 bullet points of main ideas)"
+            ),
+            (
+                "human",
+                f"Article URL: {article['url']}\n\n"
+                f"Matched keywords: {', '.join(article['matched_keywords'])}\n\n"
+                f"Article text:\n{article['text'][:3000]}"  # first 3000 chars to stay within token limits
+            )
+        ]
+
+        try:
+            response = model.invoke(messages)
+            summarized.append({
+                **article,
+                "summary": response.content
+            })
+            time.sleep(0.5)
+        except Exception as e:
+            print(f"[WARN] Skipping article {article['url']}: {e}")
+
+    return {"matched_articles": summarized}
+
 def router_function(state: ScraperState):
     if state["pending_urls"]:
         return "continue"
@@ -161,13 +215,15 @@ def create_scraper_graph():
     builder.add_node("scrape_article", scrape_article)
     builder.add_node("match_keywords", match_keywords)
     builder.add_node("rank_articles", rank_articles)
+    builder.add_node("summarize_articles", summarize_articles)
 
     builder.add_edge(START, "fetch_websites_and_keywords")
     builder.add_edge("fetch_websites_and_keywords", "crawl_blog_index")
     builder.add_edge("crawl_blog_index", "check_dedup")
     builder.add_edge("check_dedup", "scrape_article")
     builder.add_edge("scrape_article", "match_keywords")
-    builder.add_edge("rank_articles", END)
+    builder.add_edge("rank_articles", "summarize_articles")
+    builder.add_edge("summarize_articles", END)
 
     builder.add_conditional_edges(
         "match_keywords",
