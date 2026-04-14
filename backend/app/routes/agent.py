@@ -1,3 +1,4 @@
+from agents.rewriter_agent import create_rewriter_graph
 from flask import Blueprint, request, jsonify
 from ..agents.scraper_agent import create_scraper_graph
 
@@ -19,3 +20,23 @@ def scrape_agent():
     )
 
     return jsonify(final_state["matched_articles"]), 200
+
+@agent_bp.route("/agent/rewrite", methods=["POST"])
+def rewrite_agent():
+    graph = create_rewriter_graph()
+
+    # Get ScraperAgent's response
+    data = request.get_json()
+    selected_articles = data.get("selected_articles", [])
+
+    final_state = graph.invoke(
+        {
+            "pending_articles": selected_articles,
+            "current_article": {},
+            "current_rewritten": {},
+            "rewritten_articles": [],
+        },
+        config={"configurable": {"thread_id": "scraper-main"}}
+    )
+
+    return jsonify(final_state["rewritten_articles"]), 200
