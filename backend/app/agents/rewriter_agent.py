@@ -7,6 +7,9 @@ from langgraph.graph import StateGraph
 from models.draft import Draft
 from ..extensions import db
 
+import os
+os.makedirs("static/images", exist_ok=True)
+
 class ArticleState(TypedDict):
     url: str
     text: str
@@ -94,16 +97,6 @@ def generate_image(state: RewriterState):
         "current_rewritten": updated_rewritten
     }
 
-
-#     id: Mapped[int] = mapped_column(primary_key=True)
-#     title: Mapped[str]
-#     content: Mapped[str]
-#     image_path: Mapped[str | None] = mapped_column(default=None)
-#     source_url: Mapped[str]
-#     matched_keywords: Mapped[str | None] = mapped_column(default=None)
-#     status: Mapped[str] = mapped_column(default='draft')
-#     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-
 def save_draft(state: RewriterState):
     rewritten = state["current_rewritten"]
 
@@ -112,7 +105,7 @@ def save_draft(state: RewriterState):
         content=rewritten["content"],
         image_path=rewritten["featured_image_url"],
         source_url=rewritten["source_url"],
-        matched_keywords=rewritten["matched_keywords"],
+        matched_keywords=",".join(rewritten["matched_keywords"]),
         status="draft",
     )
 
