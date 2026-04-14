@@ -1,4 +1,4 @@
-from agents.rewriter_agent import create_rewriter_graph
+from ..agents.rewriter_agent import create_rewriter_graph
 from flask import Blueprint, request, jsonify
 from ..agents.scraper_agent import create_scraper_graph
 
