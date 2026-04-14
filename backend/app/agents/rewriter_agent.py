@@ -4,7 +4,7 @@ from google import genai
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.constants import START, END
 from langgraph.graph import StateGraph
-from models.draft import Draft
+from ..models.draft import Draft
 from ..extensions import db
 
 import os
@@ -40,7 +40,6 @@ def rewrite_article(state: RewriterState) -> RewriterState:
     # Tell LLM exactly what format to return so we can parse reliably
     prompt = f"""You are a blog writer. Rewrite the following article in the same style and tone as the source.
 
-Article Text: {article['text']}
 Summary: {article['summary']}
 
 Return your response in EXACTLY this format:
