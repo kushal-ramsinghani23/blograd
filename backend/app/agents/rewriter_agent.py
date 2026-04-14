@@ -38,7 +38,7 @@ def rewrite_article(state: RewriterState) -> RewriterState:
     llm = ChatGroq(model="llama-3.3-70b-versatile")
 
     # Tell LLM exactly what format to return so we can parse reliably
-    prompt = f"""You are a blog writer. Rewrite the following article in the same style and tone as the source.
+    prompt = f"""You are a blog writer. Rewrite the following article in the same style and tone as the source. Write a detailed, long-form blog post of at least 1500 words.
 
 Summary: {article['summary']}
 
@@ -70,23 +70,28 @@ CONTENT: <full rewritten article here>"""
 
 def generate_image(state: RewriterState):
     title = state["current_rewritten"]["title"]
-    client = genai.Client()
+    image_path = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRb2tMNE2CYAKICIRNU8W_KA1x4rbz1q9obBg&s"
 
-    response = client.models.generate_content(
-        model="gemini-2.0-flash-exp-image-generation",
-        contents=f"Blog hero image for: {title}"
-    )
+    try:
+        client = genai.Client()
+        response = client.models.generate_content(
+            model="gemini-3.1-flash-image-preview",
+            contents=f"Blog hero image for: {title}"
+        )
 
-    # Build unique filename from title
-    filename = title.lower().replace(" ", "_")[:50]
-    image_path = f"static/images/{filename}.png"
+        filename = title.lower().replace(" ", "_")[:50]
+        generated_path = f"static/images/{filename}.png"
 
-    for part in response.parts:
-        if part.inline_data is not None:
-            image = part.as_image()
-            image.save(image_path)
+        for part in response.parts:
+            if part.inline_data is not None:
+                image = part.as_image()
+                image.save(generated_path)
+                image_path = generated_path
+                break
 
-    # Build new object, never mutate state
+    except Exception as e:
+        print(f"Image generation failed: {e}, using default image")
+
     updated_rewritten = {
         **state["current_rewritten"],
         "featured_image_url": image_path
