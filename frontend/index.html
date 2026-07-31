@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>BlogRadar</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f0f0f;
+      --surface-1: #1a1a1a;
+      --surface-2: #222222;
+      --border: rgba(255,255,255,0.08);
+      --border-strong: rgba(255,255,255,0.14);
+      --text-primary: #f0f0f0;
+      --text-secondary: #aaaaaa;
+      --text-muted: #666666;
+      --accent: #4f6ef7;
+      --accent-bg: rgba(79,110,247,0.12);
+      --accent-text: #7b9cff;
+      --warning-bg: rgba(239,159,39,0.12);
+      --warning-text: #f0a830;
+      --success: #3B6D11;
+      --radius: 8px;
+    }
+    :root.light {
+      --bg: #f0ece4;
+      --surface-1: #e8e3da;
+      --surface-2: #ddd8ce;
+      --border: rgba(0,0,0,0.08);
+      --border-strong: rgba(0,0,0,0.14);
+      --text-primary: #1a1a1a;
+      --text-secondary: #555555;
+      --text-muted: #999999;
+      --accent: #3a58e0;
+      --accent-bg: rgba(58,88,224,0.10);
+      --accent-text: #2a45c0;
+      --warning-bg: rgba(180,100,0,0.10);
+      --warning-text: #b46000;
+      --success: #2d5a0e;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text-primary); display: flex; height: 100vh; overflow: hidden; font-size: 14px; }
+
+    /* Sidebar */
+    .sidebar { width: 220px; background: var(--surface-1); border-right: 0.5px solid var(--border); display: flex; flex-direction: column; padding: 20px 0; flex-shrink: 0; }
+    .logo { padding: 0 20px 24px; display: flex; align-items: center; gap: 10px; }
+    .logo-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--accent-bg); display: flex; align-items: center; justify-content: center; }
+    .logo-icon i { color: var(--accent-text); font-size: 17px; }
+    .logo-text { font-size: 15px; font-weight: 500; }
+    .nav-section { padding: 0 12px; margin-bottom: 4px; }
+    .nav-label { font-size: 11px; color: var(--text-muted); letter-spacing: .06em; padding: 0 8px; margin-bottom: 6px; text-transform: uppercase; }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius); cursor: pointer; font-size: 13.5px; color: var(--text-secondary); margin-bottom: 2px; transition: background .12s; user-select: none; }
+    .nav-item:hover { background: var(--surface-2); color: var(--text-primary); }
+    .nav-item.active { background: var(--surface-2); color: var(--text-primary); font-weight: 500; }
+    .nav-item i { font-size: 16px; width: 18px; text-align: center; }
+    .sidebar-footer { margin-top: auto; padding: 12px; }
+    .status-pill { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--surface-2); border-radius: var(--radius); border: 0.5px solid var(--border); }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); flex-shrink: 0; }
+    .status-text { font-size: 12px; color: var(--text-secondary); }
+
+    /* Content */
+    .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .topbar { padding: 20px 28px 16px; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .page-title { font-size: 17px; font-weight: 500; }
+    .topbar-actions { display: flex; gap: 8px; }
+    .btn { display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius); border: 0.5px solid var(--border-strong); background: transparent; color: var(--text-primary); font-size: 13px; cursor: pointer; transition: background .12s; }
+    .btn:hover { background: var(--surface-2); }
+    .btn i { font-size: 14px; }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #3d5ce0; border-color: #3d5ce0; }
+    .main { padding: 24px 28px; overflow-y: auto; flex: 1; }
+
+    /* Pages */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* Metrics */
+    .metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
+    .metric { background: var(--surface-1); border-radius: var(--radius); padding: 14px 16px; }
+    .metric-label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+    .metric-value { font-size: 22px; font-weight: 500; }
+    .metric-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+    /* Section title */
+    .section-title { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 12px; }
+
+    /* Draft cards */
+    .draft-list { display: flex; flex-direction: column; gap: 8px; }
+    .draft-card { background: var(--surface-2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: flex; align-items: center; gap: 14px; }
+    .draft-thumb { width: 44px; height: 44px; border-radius: 6px; background: var(--accent-bg); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .draft-thumb i { font-size: 20px; color: var(--accent-text); }
+    .draft-body { flex: 1; min-width: 0; }
+    .draft-title { font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .draft-meta { font-size: 12px; color: var(--text-muted); margin-top: 3px; display: flex; align-items: center; gap: 8px; }
+    .tag { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: var(--accent-bg); color: var(--accent-text); }
+    .tag.draft { background: var(--warning-bg); color: var(--warning-text); }
+    .draft-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .icon-btn { width: 30px; height: 30px; border-radius: var(--radius); border: 0.5px solid var(--border); background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-secondary); transition: background .12s; }
+    .icon-btn:hover { background: var(--surface-1); color: var(--text-primary); }
+    .icon-btn i { font-size: 14px; }
+
+    /* List pages (websites, keywords) */
+    .list-table { width: 100%; border-collapse: collapse; }
+    .list-table th { font-size: 12px; color: var(--text-muted); text-align: left; padding: 0 12px 10px; font-weight: 500; text-transform: uppercase; letter-spacing: .05em; }
+    .list-table td { padding: 12px; border-top: 0.5px solid var(--border); font-size: 13.5px; color: var(--text-primary); }
+    .list-table tr:hover td { background: var(--surface-2); }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: var(--surface-2); color: var(--text-secondary); border: 0.5px solid var(--border); }
+
+    /* Empty state */
+    .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: var(--text-muted); gap: 8px; }
+    .empty i { font-size: 36px; margin-bottom: 8px; }
+    .empty-title { font-size: 15px; font-weight: 500; color: var(--text-secondary); }
+    .empty-sub { font-size: 13px; }
+
+    /* Scrape page */
+    .scrape-card { background: var(--surface-1); border: 0.5px solid var(--border); border-radius: 12px; padding: 28px; max-width: 560px; }
+    .scrape-card h2 { font-size: 16px; font-weight: 500; margin-bottom: 8px; }
+    .scrape-card p { font-size: 13px; color: var(--text-secondary); margin-bottom: 24px; line-height: 1.6; }
+    .scrape-output { margin-top: 20px; background: var(--surface-2); border-radius: var(--radius); border: 0.5px solid var(--border); padding: 14px 16px; font-size: 12px; color: var(--text-secondary); font-family: monospace; min-height: 80px; white-space: pre-wrap; display: none; }
+    .scrape-output.visible { display: block; }
+
+    /* Form */
+    .form-row { display: flex; gap: 8px; margin-bottom: 16px; }
+    input[type="text"], input[type="url"] { flex: 1; background: var(--surface-2); border: 0.5px solid var(--border-strong); border-radius: var(--radius); padding: 8px 12px; color: var(--text-primary); font-size: 13px; outline: none; }
+    input[type="text"]:focus, input[type="url"]:focus { border-color: var(--accent); }
+    input::placeholder { color: var(--text-muted); }
+  </style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="logo">
+    <div class="logo-icon"><i class="ti ti-antenna"></i></div>
+    <span class="logo-text">BlogRadar</span>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Manage</div>
+    <div class="nav-item active" onclick="showPage('dashboard', this)"><i class="ti ti-layout-dashboard"></i> Dashboard</div>
+    <div class="nav-item" onclick="showPage('websites', this)"><i class="ti ti-world"></i> Websites</div>
+    <div class="nav-item" onclick="showPage('keywords', this)"><i class="ti ti-tag"></i> Keywords</div>
+  </div>
+
+  <div class="nav-section" style="margin-top: 16px">
+    <div class="nav-label">Content</div>
+    <div class="nav-item" onclick="showPage('drafts', this)"><i class="ti ti-file-text"></i> Drafts</div>
+    <div class="nav-item" onclick="showPage('scrape', this)"><i class="ti ti-radar"></i> Scrape</div>
+  </div>
+
+  <div class="sidebar-footer">
+    <button class="btn" onclick="toggleTheme()" id="theme-btn" style="width:100%;margin-bottom:8px;justify-content:center"><i class="ti ti-sun" id="theme-icon"></i> <span id="theme-label">Light mode</span></button>
+    <div class="status-pill">
+      <div class="status-dot"></div>
+      <span class="status-text">Flask running on :5000</span>
+    </div>
+  </div>
+</div>
+
+<div class="content">
+  <div class="topbar">
+    <span class="page-title" id="page-title">Dashboard</span>
+    <div class="topbar-actions" id="topbar-actions">
+      <button class="btn" onclick="showPage('scrape', document.querySelector('[onclick*=scrape]'))"><i class="ti ti-refresh"></i> Scrape now</button>
+      <button class="btn btn-primary" onclick="showPage('websites', document.querySelector('[onclick*=websites]'))"><i class="ti ti-plus"></i> Add website</button>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- Dashboard -->
+    <div id="page-dashboard" class="page active">
+      <div class="metric-grid">
+        <div class="metric">
+          <div class="metric-label">Websites tracked</div>
+          <div class="metric-value" id="dash-websites">—</div>
+          <div class="metric-sub">monitored sources</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Keywords active</div>
+          <div class="metric-value" id="dash-keywords">—</div>
+          <div class="metric-sub">match triggers</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Drafts saved</div>
+          <div class="metric-value" id="dash-drafts">—</div>
+          <div class="metric-sub">ready to review</div>
+        </div>
+      </div>
+      <div class="section-title">Recent drafts</div>
+      <div class="draft-list" id="dash-draft-list">
+        <div class="empty"><i class="ti ti-file-off"></i><span class="empty-title">No drafts yet</span><span class="empty-sub">Run a scrape to get started</span></div>
+      </div>
+    </div>
+
+    <!-- Websites -->
+    <div id="page-websites" class="page">
+      <div class="form-row">
+        <input type="url" id="website-url" placeholder="https://techcrunch.com">
+        <input type="text" id="website-name" placeholder="Name (optional)">
+        <button class="btn btn-primary" onclick="addWebsite()"><i class="ti ti-plus"></i> Add</button>
+      </div>
+      <table class="list-table">
+        <thead><tr><th>URL</th><th>Name</th><th>Status</th><th></th></tr></thead>
+        <tbody id="websites-list"></tbody>
+      </table>
+    </div>
+
+    <!-- Keywords -->
+    <div id="page-keywords" class="page">
+      <div class="form-row">
+        <input type="text" id="keyword-word" placeholder="e.g. artificial intelligence">
+        <input type="text" id="keyword-category" placeholder="Category (optional)">
+        <button class="btn btn-primary" onclick="addKeyword()"><i class="ti ti-plus"></i> Add</button>
+      </div>
+      <table class="list-table">
+        <thead><tr><th>Keyword</th><th>Category</th><th></th></tr></thead>
+        <tbody id="keywords-list"></tbody>
+      </table>
+    </div>
+
+    <!-- Drafts -->
+    <div id="page-drafts" class="page">
+      <div class="draft-list" id="drafts-list">
+        <div class="empty"><i class="ti ti-file-off"></i><span class="empty-title">No drafts yet</span><span class="empty-sub">Run a scrape and rewrite to generate drafts</span></div>
+      </div>
+    </div>
+
+    <!-- Scrape -->
+    <div id="page-scrape" class="page">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div>
+          <div style="font-size:15px;font-weight:500;margin-bottom:4px">Run scraper</div>
+          <div style="font-size:13px;color:var(--text-secondary)">Crawls tracked websites, finds keyword matches, and summarizes the top articles.</div>
+        </div>
+        <button class="btn btn-primary" onclick="runScrape()" id="scrape-btn"><i class="ti ti-radar"></i> Start scraping</button>
+      </div>
+      <div id="scrape-status" style="display:none;font-size:13px;color:var(--text-secondary);margin-bottom:16px;align-items:center;gap:8px"></div>
+      <div id="scrape-results" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <span class="section-title" style="margin:0" id="scrape-count"></span>
+          <button class="btn btn-primary" onclick="rewriteSelected()" id="rewrite-btn"><i class="ti ti-pencil"></i> Rewrite selected</button>
+        </div>
+        <div id="article-cards" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const API = 'http://127.0.0.1:5000'
+
+const pageTitles = { dashboard: 'Dashboard', websites: 'Websites', keywords: 'Keywords', drafts: 'Drafts', scrape: 'Scrape' }
+
+function showPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'))
+  document.getElementById('page-' + name).classList.add('active')
+  if (el) el.classList.add('active')
+  document.getElementById('page-title').textContent = pageTitles[name]
+  if (name === 'websites') loadWebsites()
+  if (name === 'keywords') loadKeywords()
+  if (name === 'drafts') loadDrafts()
+  if (name === 'dashboard') loadDashboard()
+}
+
+function toggleTheme() {
+  const root = document.documentElement
+  const isLight = root.classList.toggle('light')
+  document.getElementById('theme-icon').className = isLight ? 'ti ti-moon' : 'ti ti-sun'
+  document.getElementById('theme-label').textContent = isLight ? 'Dark mode' : 'Light mode'
+}
+
+async function loadDashboard() {
+  const [ws, kws, drafts] = await Promise.all([
+    fetch(`${API}/websites`).then(r => r.json()),
+    fetch(`${API}/keywords`).then(r => r.json()),
+    fetch(`${API}/drafts`).then(r => r.json())
+  ])
+  document.getElementById('dash-websites').textContent = ws.length
+  document.getElementById('dash-keywords').textContent = kws.length
+  document.getElementById('dash-drafts').textContent = drafts.length
+  const list = document.getElementById('dash-draft-list')
+  if (!drafts.length) return
+  list.innerHTML = drafts.slice(0, 5).map(d => draftCardHTML(d)).join('')
+}
+
+function draftCardHTML(d) {
+  return `<div class="draft-card">
+    <div class="draft-thumb"><i class="ti ti-file-text"></i></div>
+    <div class="draft-body">
+      <div class="draft-title">${d.title}</div>
+      <div class="draft-meta"><span>${d.source_url || ''}</span><span class="tag draft">${d.status}</span></div>
+    </div>
+    <div class="draft-actions">
+      <button class="icon-btn" onclick="deleteDraft(${d.id})" aria-label="Delete"><i class="ti ti-trash"></i></button>
+    </div>
+  </div>`
+}
+
+async function loadWebsites() {
+  const data = await fetch(`${API}/websites`).then(r => r.json())
+  const tbody = document.getElementById('websites-list')
+  tbody.innerHTML = data.length ? data.map(w => `<tr>
+    <td>${w.url}</td><td>${w.name || '—'}</td>
+    <td><span class="badge">${w.status || 'active'}</span></td>
+    <td><button class="icon-btn" onclick="deleteWebsite(${w.id})"><i class="ti ti-trash"></i></button></td>
+  </tr>`).join('') : `<tr><td colspan="4"><div class="empty"><i class="ti ti-world-off"></i><span class="empty-title">No websites yet</span></div></td></tr>`
+}
+
+async function addWebsite() {
+  const url = document.getElementById('website-url').value.trim()
+  const name = document.getElementById('website-name').value.trim()
+  if (!url) return
+  await fetch(`${API}/websites`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, name }) })
+  document.getElementById('website-url').value = ''
+  document.getElementById('website-name').value = ''
+  loadWebsites()
+}
+
+async function deleteWebsite(id) {
+  await fetch(`${API}/websites/${id}`, { method: 'DELETE' })
+  loadWebsites()
+}
+
+async function loadKeywords() {
+  const data = await fetch(`${API}/keywords`).then(r => r.json())
+  const tbody = document.getElementById('keywords-list')
+  tbody.innerHTML = data.length ? data.map(k => `<tr>
+    <td>${k.word}</td><td>${k.category || '—'}</td>
+    <td><button class="icon-btn" onclick="deleteKeyword(${k.id})"><i class="ti ti-trash"></i></button></td>
+  </tr>`).join('') : `<tr><td colspan="3"><div class="empty"><i class="ti ti-tag-off"></i><span class="empty-title">No keywords yet</span></div></td></tr>`
+}
+
+async function addKeyword() {
+  const word = document.getElementById('keyword-word').value.trim()
+  const category = document.getElementById('keyword-category').value.trim()
+  if (!word) return
+  await fetch(`${API}/keywords`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ word, category }) })
+  document.getElementById('keyword-word').value = ''
+  document.getElementById('keyword-category').value = ''
+  loadKeywords()
+}
+
+async function deleteKeyword(id) {
+  await fetch(`${API}/keywords/${id}`, { method: 'DELETE' })
+  loadKeywords()
+}
+
+async function loadDrafts() {
+  const data = await fetch(`${API}/drafts`).then(r => r.json())
+  const list = document.getElementById('drafts-list')
+  list.innerHTML = data.length ? data.map(d => draftCardHTML(d)).join('') : `<div class="empty"><i class="ti ti-file-off"></i><span class="empty-title">No drafts yet</span></div>`
+}
+
+async function deleteDraft(id) {
+  await fetch(`${API}/drafts/${id}`, { method: 'DELETE' })
+  loadDrafts()
+  loadDashboard()
+}
+
+let scrapedArticles = []
+
+async function runScrape() {
+  const btn = document.getElementById('scrape-btn')
+  const status = document.getElementById('scrape-status')
+  const results = document.getElementById('scrape-results')
+
+  btn.disabled = true
+  btn.innerHTML = '<i class="ti ti-loader"></i> Scraping...'
+  status.style.display = 'flex'
+  status.innerHTML = '<i class="ti ti-loader" style="font-size:14px"></i> Crawling websites and matching keywords — this may take a minute...'
+  results.style.display = 'none'
+
+  try {
+    const res = await fetch(`${API}/agent/scrape`, { method: 'POST' })
+    scrapedArticles = await res.json()
+
+    document.getElementById('scrape-count').textContent = `${scrapedArticles.length} articles found — select which to rewrite`
+    document.getElementById('article-cards').innerHTML = scrapedArticles.map((a, i) => `
+      <div style="background:var(--surface-2);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px 16px;display:flex;align-items:flex-start;gap:12px">
+        <input type="checkbox" id="art-${i}" style="margin-top:3px;accent-color:var(--accent);width:15px;height:15px;flex-shrink:0">
+        <label for="art-${i}" style="cursor:pointer;flex:1;min-width:0">
+          <div style="font-size:13.5px;font-weight:500;margin-bottom:4px;color:var(--text-primary)">${a.url}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">${a.source_site} &nbsp;·&nbsp; ${(a.matched_keywords||[]).join(', ')}</div>
+          <div style="font-size:12px;color:var(--text-secondary);line-height:1.5">${(a.summary||'').substring(0,200)}...</div>
+        </label>
+      </div>`).join('')
+
+    status.innerHTML = `<i class="ti ti-circle-check" style="font-size:14px;color:var(--accent)"></i> Done — ${scrapedArticles.length} matched articles`
+    results.style.display = 'block'
+  } catch(e) {
+    status.innerHTML = '<i class="ti ti-alert-circle" style="font-size:14px;color:#e24b4a"></i> Scrape failed — is Flask running?'
+  }
+
+  btn.disabled = false
+  btn.innerHTML = '<i class="ti ti-radar"></i> Scrape again'
+}
+
+async function rewriteSelected() {
+  const selected = scrapedArticles.filter((_, i) => document.getElementById(`art-${i}`)?.checked)
+  if (!selected.length) { alert('Select at least one article to rewrite.'); return }
+
+  const btn = document.getElementById('rewrite-btn')
+  btn.disabled = true
+  btn.innerHTML = '<i class="ti ti-loader"></i> Rewriting...'
+
+  try {
+    await fetch(`${API}/agent/rewrite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selected_articles: selected })
+    })
+    btn.innerHTML = '<i class="ti ti-circle-check"></i> Done!'
+    setTimeout(() => showPage('drafts', document.querySelector('[onclick*=drafts]')), 800)
+  } catch(e) {
+    btn.innerHTML = '<i class="ti ti-alert-circle"></i> Failed'
+    btn.disabled = false
+  }
+}
+
+loadDashboard()
+</script>
+</body>
+</html>
