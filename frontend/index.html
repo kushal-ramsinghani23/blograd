@@ -300,17 +300,19 @@ function toggleTheme() {
 }
 
 async function loadDashboard() {
-  const [ws, kws, drafts] = await Promise.all([
-    fetch(`${API}/websites`).then(r => r.json()),
-    fetch(`${API}/keywords`).then(r => r.json()),
-    fetch(`${API}/drafts`).then(r => r.json())
-  ])
-  document.getElementById('dash-websites').textContent = ws.length
-  document.getElementById('dash-keywords').textContent = kws.length
-  document.getElementById('dash-drafts').textContent = drafts.length
-  const list = document.getElementById('dash-draft-list')
-  if (!drafts.length) return
-  list.innerHTML = drafts.slice(0, 5).map(d => draftCardHTML(d)).join('')
+  try {
+    const [ws, kws, drafts] = await Promise.all([
+      fetch(`${API}/websites`).then(r => r.json()),
+      fetch(`${API}/keywords`).then(r => r.json()),
+      fetch(`${API}/drafts`).then(r => r.json())
+    ])
+    document.getElementById('dash-websites').textContent = ws.length
+    document.getElementById('dash-keywords').textContent = kws.length
+    document.getElementById('dash-drafts').textContent = drafts.length
+    const list = document.getElementById('dash-draft-list')
+    if (!drafts.length) return
+    list.innerHTML = drafts.slice(0, 5).map(d => draftCardHTML(d)).join('')
+  } catch(e) { showToast('Failed to load dashboard') }
 }
 
 function draftCardHTML(d) {
@@ -327,64 +329,82 @@ function draftCardHTML(d) {
 }
 
 async function loadWebsites() {
-  const data = await fetch(`${API}/websites`).then(r => r.json())
-  const tbody = document.getElementById('websites-list')
-  tbody.innerHTML = data.length ? data.map(w => `<tr>
-    <td>${w.url}</td><td>${w.name || '—'}</td>
-    <td><span class="badge">${w.status || 'active'}</span></td>
-    <td><button class="icon-btn" onclick="deleteWebsite(${w.id})"><i class="ti ti-trash"></i></button></td>
-  </tr>`).join('') : `<tr><td colspan="4"><div class="empty"><i class="ti ti-world-off"></i><span class="empty-title">No websites yet</span></div></td></tr>`
+  try {
+    const data = await fetch(`${API}/websites`).then(r => r.json())
+    const tbody = document.getElementById('websites-list')
+    tbody.innerHTML = data.length ? data.map(w => `<tr>
+      <td>${w.url}</td><td>${w.name || '—'}</td>
+      <td><span class="badge">${w.status || 'active'}</span></td>
+      <td><button class="icon-btn" onclick="deleteWebsite(${w.id})"><i class="ti ti-trash"></i></button></td>
+    </tr>`).join('') : `<tr><td colspan="4"><div class="empty"><i class="ti ti-world-off"></i><span class="empty-title">No websites yet</span></div></td></tr>`
+  } catch(e) { showToast('Failed to load websites') }
 }
 
 async function addWebsite() {
   const url = document.getElementById('website-url').value.trim()
   const name = document.getElementById('website-name').value.trim()
   if (!url) return
-  await fetch(`${API}/websites`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, name }) })
-  document.getElementById('website-url').value = ''
-  document.getElementById('website-name').value = ''
-  loadWebsites()
+  try {
+    await fetch(`${API}/websites`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, name }) })
+    document.getElementById('website-url').value = ''
+    document.getElementById('website-name').value = ''
+    loadWebsites()
+  } catch(e) {
+    showToast('Failed to add website')
+  }
 }
 
 async function deleteWebsite(id) {
-  await fetch(`${API}/websites/${id}`, { method: 'DELETE' })
-  loadWebsites()
+  try {
+    await fetch(`${API}/websites/${id}`, { method: 'DELETE' })
+    loadWebsites()
+  } catch(e) { showToast('Failed to delete website') }
 }
 
 async function loadKeywords() {
-  const data = await fetch(`${API}/keywords`).then(r => r.json())
-  const tbody = document.getElementById('keywords-list')
-  tbody.innerHTML = data.length ? data.map(k => `<tr>
-    <td>${k.word}</td><td>${k.category || '—'}</td>
-    <td><button class="icon-btn" onclick="deleteKeyword(${k.id})"><i class="ti ti-trash"></i></button></td>
-  </tr>`).join('') : `<tr><td colspan="3"><div class="empty"><i class="ti ti-tag-off"></i><span class="empty-title">No keywords yet</span></div></td></tr>`
+  try {
+    const data = await fetch(`${API}/keywords`).then(r => r.json())
+    const tbody = document.getElementById('keywords-list')
+    tbody.innerHTML = data.length ? data.map(k => `<tr>
+      <td>${k.word}</td><td>${k.category || '—'}</td>
+      <td><button class="icon-btn" onclick="deleteKeyword(${k.id})"><i class="ti ti-trash"></i></button></td>
+    </tr>`).join('') : `<tr><td colspan="3"><div class="empty"><i class="ti ti-tag-off"></i><span class="empty-title">No keywords yet</span></div></td></tr>`
+  } catch(e) { showToast('Failed to load keywords') }
 }
 
 async function addKeyword() {
   const word = document.getElementById('keyword-word').value.trim()
   const category = document.getElementById('keyword-category').value.trim()
   if (!word) return
-  await fetch(`${API}/keywords`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ word, category }) })
-  document.getElementById('keyword-word').value = ''
-  document.getElementById('keyword-category').value = ''
-  loadKeywords()
+  try {
+    await fetch(`${API}/keywords`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ word, category }) })
+    document.getElementById('keyword-word').value = ''
+    document.getElementById('keyword-category').value = ''
+    loadKeywords()
+  } catch(e) { showToast('Failed to add keyword') }
 }
 
 async function deleteKeyword(id) {
-  await fetch(`${API}/keywords/${id}`, { method: 'DELETE' })
-  loadKeywords()
+  try {
+    await fetch(`${API}/keywords/${id}`, { method: 'DELETE' })
+    loadKeywords()
+  } catch(e) { showToast('Failed to delete keyword') }
 }
 
 async function loadDrafts() {
-  const data = await fetch(`${API}/drafts`).then(r => r.json())
-  const list = document.getElementById('drafts-list')
-  list.innerHTML = data.length ? data.map(d => draftCardHTML(d)).join('') : `<div class="empty"><i class="ti ti-file-off"></i><span class="empty-title">No drafts yet</span></div>`
+  try {
+    const data = await fetch(`${API}/drafts`).then(r => r.json())
+    const list = document.getElementById('drafts-list')
+    list.innerHTML = data.length ? data.map(d => draftCardHTML(d)).join('') : `<div class="empty"><i class="ti ti-file-off"></i><span class="empty-title">No drafts yet</span></div>`
+  } catch(e) { showToast('Failed to load drafts') }
 }
 
 async function deleteDraft(id) {
-  await fetch(`${API}/drafts/${id}`, { method: 'DELETE' })
-  loadDrafts()
-  loadDashboard()
+  try {
+    await fetch(`${API}/drafts/${id}`, { method: 'DELETE' })
+    loadDrafts()
+    loadDashboard()
+  } catch(e) { showToast('Failed to delete draft') }
 }
 
 let scrapedArticles = []
@@ -447,8 +467,6 @@ async function rewriteSelected() {
   }
 }
 
-loadDashboard()
-
 let currentDraftId = null
 let easyMDE = null
 
@@ -498,6 +516,32 @@ async function copyDraft() {
   btn.innerHTML = '<i class="ti ti-circle-check"></i> Copied!'
   setTimeout(() => btn.innerHTML = orig, 1500)
 }
+
+function showToast(message, type = 'error') {
+  const toast = document.createElement('div')
+  toast.style.cssText = `position:fixed;bottom:24px;right:24px;padding:12px 18px;border-radius:var(--radius);font-size:13px;color:#fff;background:${type === 'error' ? '#e24b4a' : '#3B6D11'};z-index:9999;transition:opacity .3s`
+  toast.textContent = message
+  document.body.appendChild(toast)
+  setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300) }, 3000)
+}
+
+async function checkFlaskStatus() {
+  const dot = document.querySelector('.status-dot')
+  const text = document.querySelector('.status-text')
+  try {
+    await fetch(`${API}/websites`)
+    dot.style.background = '#3B6D11'
+    text.textContent = 'Flask running on :5000'
+  } catch(e) {
+    dot.style.background = '#e24b4a'
+    text.textContent = 'Flask offline'
+  }
+}
+
+checkFlaskStatus()
+setInterval(checkFlaskStatus, 30000)
+
+loadDashboard()
 </script>
 <script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
 </body>
