@@ -4,6 +4,17 @@
   <meta charset="UTF-8">
   <title>BlogRadar</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css">
+  <style>
+    .EasyMDEContainer { height: 100%; display: flex; flex-direction: column; }
+    .EasyMDEContainer .CodeMirror { flex: 1; background: var(--surface-2); color: var(--text-primary); border: none; font-size: 14px; line-height: 1.7; }
+    .EasyMDEContainer .editor-toolbar { background: var(--surface-1); border-color: var(--border); }
+    .EasyMDEContainer .editor-toolbar button { color: var(--text-secondary) !important; }
+    .EasyMDEContainer .editor-toolbar button:hover { background: var(--surface-2); color: var(--text-primary) !important; }
+    .EasyMDEContainer .editor-preview { background: var(--surface-2); color: var(--text-primary); }
+    .EasyMDEContainer .editor-statusbar { color: var(--text-muted); border-color: var(--border); }
+    .CodeMirror-scroll { min-height: 400px; }
+  </style>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -225,6 +236,23 @@
       </div>
     </div>
 
+    <!-- Editor -->
+    <div id="page-editor" class="page">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <button class="btn" onclick="showPage('drafts', document.querySelector('[onclick*=drafts]'))"><i class="ti ti-arrow-left"></i> Back</button>
+        <input type="text" id="editor-title" placeholder="Draft title" style="flex:1;font-size:15px;font-weight:500">
+        <select id="editor-status" style="background:var(--surface-2);border:0.5px solid var(--border-strong);border-radius:var(--radius);padding:8px 12px;color:var(--text-primary);font-size:13px;outline:none">
+          <option value="draft">Draft</option>
+          <option value="ready">Ready</option>
+          <option value="published">Published</option>
+        </select>
+        <button class="btn btn-primary" onclick="saveDraft()"><i class="ti ti-device-floppy"></i> Save</button>
+        <button class="btn btn-primary" onclick="saveDraft()"><i class="ti ti-device-floppy"></i> Save</button>
+
+      </div>
+      <textarea id="editor-content"></textarea>
+    </div>
+
     <!-- Scrape -->
     <div id="page-scrape" class="page">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
@@ -286,14 +314,14 @@ async function loadDashboard() {
 }
 
 function draftCardHTML(d) {
-  return `<div class="draft-card">
+  return `<div class="draft-card" style="cursor:pointer" onclick="openEditor(${JSON.stringify(d).replace(/"/g, '&quot;')})">
     <div class="draft-thumb"><i class="ti ti-file-text"></i></div>
     <div class="draft-body">
       <div class="draft-title">${d.title}</div>
       <div class="draft-meta"><span>${d.source_url || ''}</span><span class="tag draft">${d.status}</span></div>
     </div>
     <div class="draft-actions">
-      <button class="icon-btn" onclick="deleteDraft(${d.id})" aria-label="Delete"><i class="ti ti-trash"></i></button>
+      <button class="icon-btn" onclick="event.stopPropagation();deleteDraft(${d.id})" aria-label="Delete"><i class="ti ti-trash"></i></button>
     </div>
   </div>`
 }
@@ -420,6 +448,50 @@ async function rewriteSelected() {
 }
 
 loadDashboard()
+
+let currentDraftId = null
+let easyMDE = null
+
+function openEditor(draft) {
+  currentDraftId = draft.id
+  document.getElementById('editor-title').value = draft.title || ''
+  document.getElementById('editor-status').value = draft.status || 'draft'
+
+  showPage('editor', null)
+  document.getElementById('page-title').textContent = 'Edit draft'
+
+  if (easyMDE) { easyMDE.toTextArea(); easyMDE = null }
+
+  easyMDE = new EasyMDE({
+    element: document.getElementById('editor-content'),
+    initialValue: draft.content || '',
+    spellChecker: false,
+    autosave: { enabled: false },
+    toolbar: ['bold','italic','heading','|','quote','unordered-list','ordered-list','|','link','|','preview','side-by-side','fullscreen'],
+    minHeight: '420px'
+  })
+}
+
+async function saveDraft() {
+  if (!currentDraftId) return
+  const title = document.getElementById('editor-title').value
+  const content = easyMDE.value()
+  const status = document.getElementById('editor-status').value
+
+  const res = await fetch(`${API}/drafts/${currentDraftId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, content, status })
+  })
+
+  if (res.ok) {
+    const btn = document.querySelector('[onclick="saveDraft()"]')
+    const orig = btn.innerHTML
+    btn.innerHTML = '<i class="ti ti-circle-check"></i> Saved'
+    setTimeout(() => btn.innerHTML = orig, 1500)
+  }
+}
 </script>
+<script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
 </body>
 </html>
