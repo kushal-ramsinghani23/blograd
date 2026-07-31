@@ -248,7 +248,7 @@
         </select>
         <button class="btn btn-primary" onclick="saveDraft()"><i class="ti ti-device-floppy"></i> Save</button>
         <button class="btn btn-primary" onclick="saveDraft()"><i class="ti ti-device-floppy"></i> Save</button>
-
+        <button class="btn" onclick="copyDraft()"><i class="ti ti-copy"></i> Copy</button>
       </div>
       <textarea id="editor-content"></textarea>
     </div>
@@ -490,6 +490,13 @@ async function saveDraft() {
     btn.innerHTML = '<i class="ti ti-circle-check"></i> Saved'
     setTimeout(() => btn.innerHTML = orig, 1500)
   }
+}
+async function copyDraft() {
+  await navigator.clipboard.writeText(easyMDE.value())
+  const btn = document.querySelector('[onclick="copyDraft()"]')
+  const orig = btn.innerHTML
+  btn.innerHTML = '<i class="ti ti-circle-check"></i> Copied!'
+  setTimeout(() => btn.innerHTML = orig, 1500)
 }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
