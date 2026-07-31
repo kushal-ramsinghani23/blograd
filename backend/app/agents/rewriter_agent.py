@@ -38,13 +38,61 @@ def rewrite_article(state: RewriterState) -> RewriterState:
     llm = ChatGroq(model="llama-3.3-70b-versatile")
 
     # Tell LLM exactly what format to return so we can parse reliably
-    prompt = f"""You are a blog writer. Rewrite the following article in the same style and tone as the source. Write a detailed, long-form blog post of at least 1500 words.
+    prompt = f"""You are a professional blog writer. Rewrite the following article as a polished, original blog post.
 
-Summary: {article['summary']}
+    Summary: {article['summary']}
+    Source URL: {article['url']}
 
-Return your response in EXACTLY this format:
-TITLE: <title here>
-CONTENT: <full rewritten article here>"""
+    Return your response in EXACTLY this format:
+    TITLE: <compelling title here>
+    CONTENT:
+    # <title>
+
+    > <one line hook>
+
+    ---
+
+    ## Introduction
+
+    <2-3 paragraphs>
+
+    ---
+
+    ## <Section 1 heading based on content>
+
+    <content>
+
+    ---
+
+    ## <Section 2 heading based on content>
+
+    <content>
+
+    ---
+
+    ## <Section 3 heading based on content>
+
+    <content>
+
+    ---
+
+    ## Key Takeaways
+
+    - <takeaway 1>
+    - <takeaway 2>
+    - <takeaway 3>
+
+    ---
+
+    ## Conclusion
+
+    <1-2 paragraphs>
+
+    ---
+
+    *Sources: {article['url']}*
+
+    Write at least 800 words. Use the STYLE from the summary to match tone and vocabulary."""
 
     response = llm.invoke(prompt)
     text = response.content
