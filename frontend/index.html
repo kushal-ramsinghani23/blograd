@@ -5,6 +5,7 @@
   <title>BlogRadar</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css">
+  <script src="./marked.min.js"></script>
   <style>
     .EasyMDEContainer { height: 100%; display: flex; flex-direction: column; }
     .EasyMDEContainer .CodeMirror { flex: 1; background: var(--surface-2); color: var(--text-primary); border: none; font-size: 14px; line-height: 1.7; }
@@ -135,6 +136,11 @@
     input[type="text"], input[type="url"] { flex: 1; background: var(--surface-2); border: 0.5px solid var(--border-strong); border-radius: var(--radius); padding: 8px 12px; color: var(--text-primary); font-size: 13px; outline: none; }
     input[type="text"]:focus, input[type="url"]:focus { border-color: var(--accent); }
     input::placeholder { color: var(--text-muted); }
+
+    #draft-preview h1,#draft-preview h2,#draft-preview h3 { font-size:13px;font-weight:600;color:var(--text-primary);margin:8px 0 4px; }
+    #draft-preview p { margin-bottom:6px; }
+    #draft-preview ul,#draft-preview ol { padding-left:16px;margin-bottom:6px; }
+    #draft-preview blockquote { border-left:2px solid var(--accent);padding-left:8px;color:var(--text-muted); }
   </style>
 </head>
 <body>
@@ -332,8 +338,15 @@ async function loadDashboard() {
   } catch(e) { showToast('Failed to load dashboard') }
 }
 
+const draftContentMap = {}
+
 function draftCardHTML(d) {
-  return `<div class="draft-card" style="cursor:pointer" onclick="openEditor(${JSON.stringify(d).replace(/"/g, '&quot;')})">
+  draftContentMap[d.id] = d.content || ''
+  const safeD = JSON.stringify(d).replace(/"/g, '&quot;')
+  return `<div class="draft-card" style="cursor:pointer;position:relative"
+    onclick="openEditor(${safeD})"
+    onmouseenter="showPreview(event, draftContentMap[${d.id}])"
+    onmouseleave="hidePreview()">
     <div class="draft-thumb"><i class="ti ti-file-text"></i></div>
     <div class="draft-body">
       <div class="draft-title">${d.title}</div>
@@ -343,6 +356,40 @@ function draftCardHTML(d) {
       <button class="icon-btn" onclick="event.stopPropagation();deleteDraft(${d.id})" aria-label="Delete"><i class="ti ti-trash"></i></button>
     </div>
   </div>`
+}
+
+function showPreview(event, content) {
+  if (!content || !window.marked) return
+  hidePreview()
+  const rect = event.currentTarget.getBoundingClientRect()
+  const preview = document.createElement('div')
+  preview.id = 'draft-preview'
+  preview.style.cssText = `
+    position:fixed;
+    left:${rect.left}px;
+    top:${rect.bottom + 8}px;
+    width:${rect.width}px;
+    max-height:200px;
+    overflow:hidden;
+    background:var(--surface-1);
+    border:0.5px solid var(--border-strong);
+    border-radius:var(--radius);
+    padding:16px;
+    font-size:12px;
+    line-height:1.7;
+    color:var(--text-secondary);
+    z-index:9999;
+    box-shadow:0 8px 24px rgba(0,0,0,0.25);
+    pointer-events:none;
+    -webkit-mask-image:linear-gradient(to bottom, black 60%, transparent 100%);
+    mask-image:linear-gradient(to bottom, black 60%, transparent 100%);`
+  preview.innerHTML = window.marked.parse(content.substring(0, 400))
+  document.body.appendChild(preview)
+}
+
+function hidePreview() {
+  const existing = document.getElementById('draft-preview')
+  if (existing) existing.remove()
 }
 
 async function loadWebsites() {
