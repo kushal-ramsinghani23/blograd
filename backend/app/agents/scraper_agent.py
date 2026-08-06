@@ -4,17 +4,15 @@ from urllib.parse import urlparse
 
 from langchain_groq import ChatGroq
 from langgraph.graph import StateGraph, START, END
-from bs4 import BeautifulSoup
 from langgraph.checkpoint.memory import MemorySaver
-from playwright.sync_api import sync_playwright
 import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
-import requests
 
 from ..models.keyword import Keyword
 from ..models.website import Website
 
+from firecrawl import FirecrawlApp
 
 class ArticleState(TypedDict):
     url: str
@@ -40,86 +38,72 @@ def fetch_websites_and_keywords(state: ScraperState):
         "keywords": keywords
     }
 
-def crawl_blog_index(state: ScraperState):
-    pending_urls = set()
 
-    for url in state["websites"]:
+def crawl_blog_index(state: ScraperState) -> ScraperState:
+    firecrawl = FirecrawlApp(api_key=os.getenv("FIRECRAWL_API_KEY"))
+    all_urls = []
+    for website in state["websites"]:
         try:
-            path = urlparse(url).path
-            if path == "" or path == "/":
-                url = url.rstrip("/") + "/blog"
+            result = firecrawl.crawl_url(
+                website,
+                limit=5,
+                scrape_options={"formats": ["markdown"]}
+            )
+            # result is a CrawlJob object — access .data
+            pages = result.data if hasattr(result, 'data') else result.get("data", [])
+            urls = [
+                page_url for page_url in urls
+                if any(segment in page_url for segment in ['/2024/', '/2025/', '/2026/', '/posts/', '/blog/'])
+                    and 'sitemap' not in page_url
+                    and '/tag/' not in page_url
+            ]
+            for page in pages:
+                meta = page.metadata if hasattr(page, 'metadata') else page.get("metadata", {})
+                url = meta.get("sourceURL") if isinstance(meta, dict) else getattr(meta, 'source_url', None)
+                if url:
+                    urls.append(url)
+            print(f"[DEBUG] URLs found for {website}: {urls}")
+            all_urls.extend(urls)
+            time.sleep(2)  # respect rate limit
+        except Exception as e:
+            print(f"[WARN] Failed to crawl {website}: {e}")
+    return {"pending_urls": list(set(all_urls))}
 
-            response = requests.get(url, timeout=10)
-            if response.status_code != 200:
-                # fallback to original URL without /blog
-                url = url.replace("/blog", "")
-                response = requests.get(url, timeout=10)
-        except Exception:
-            continue
-        html_doc = response.text
+def check_dedup(state: ScraperState) -> ScraperState:
+    pending = [url for url in state["pending_urls"] if url not in state["scraped_urls"]]
+    return {"pending_urls": pending}
 
-        soup = BeautifulSoup(html_doc, "html.parser")
-        for link in soup.find_all("a"):
-            link_href = link.get("href")
-            if link_href and link_href.startswith("http"):
-                site_domain = urlparse(url).netloc
-                if urlparse(link_href).netloc == site_domain:
-                    pending_urls.add(link_href)
+def scrape_article(state: ScraperState) -> ScraperState:
+    if not state["pending_urls"]:
+        return {
+            "pending_urls": [],
+            "current_article": {"url": "", "text": "", "source_site": "", "matched_keywords": [], "summary": ""}
+        }
 
-    return {
-        'pending_urls': list(pending_urls),
-    }
-
-def check_dedup(state: ScraperState):
-    updated_pending_urls = [url for url in state["pending_urls"] if url not in state["scraped_urls"]]
-    return {
-        'pending_urls': updated_pending_urls,
-    }
-
-def scrape_article(state: ScraperState):
-    pending_urls = state["pending_urls"]
-    scraped_urls = state["scraped_urls"]
+    firecrawl = FirecrawlApp(api_key=os.getenv("FIRECRAWL_API_KEY"))
+    url = state["pending_urls"][0]
+    remaining = state["pending_urls"][1:]
 
     try:
-        response = requests.get(pending_urls[0], timeout=10)
-    except Exception:
-        # skip this URL, move on
-        return {
-            'pending_urls': pending_urls[1:],
-            'scraped_urls': scraped_urls + [pending_urls[0]],
-        }
-    html_doc = response.text
-    soup = BeautifulSoup(html_doc, "html.parser")
-
-    content = soup.get_text(strip=True)
-    text = content
-    if len(content) < 500:
-        try:
-            with sync_playwright() as p:
-                browser = p.chromium.launch()
-                page = browser.new_page()
-                page.goto(pending_urls[0], timeout=60000)
-                page.wait_for_load_state("domcontentloaded")
-                content = page.content()
-                browser.close()
-            soup = BeautifulSoup(content, "html.parser")
-            text = soup.get_text(strip=True)
-        except Exception:
-            text = content  # use whatever BS4 got, even if minimal
-    current_article: ArticleState = {
-        "url": pending_urls[0],
-        "text": text,
-        "source_site": urlparse(pending_urls[0]).netloc,
-        "matched_keywords": []
-    }
-
-    scraped_urls.append(pending_urls[0])
-    pending_urls = pending_urls[1:]
+        result = firecrawl.scrape_url(url, formats=["markdown"])
+        # result is a Document object — access attribute directly
+        text = getattr(result, 'markdown', None) or ""
+        source_site = url.split("/")[2]
+        time.sleep(6)  # 10 req/min = 1 every 6s
+    except Exception as e:
+        print(f"[WARN] Failed to scrape {url}: {e}")
+        text = ""
+        source_site = url.split("/")[2] if "/" in url else url
 
     return {
-        'pending_urls': pending_urls,
-        'scraped_urls': scraped_urls,
-        'current_article': current_article,
+        "pending_urls": remaining,
+        "current_article": {
+            "url": url,
+            "text": text,
+            "source_site": source_site,
+            "matched_keywords": [],
+            "summary": ""
+        }
     }
 
 def match_keywords(state: ScraperState):
