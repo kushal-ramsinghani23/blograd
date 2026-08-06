@@ -257,10 +257,27 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
         <div>
           <div style="font-size:15px;font-weight:500;margin-bottom:4px">Run scraper</div>
-          <div style="font-size:13px;color:var(--text-secondary)">Crawls tracked websites, finds keyword matches, and summarizes the top articles.</div>
+          <div style="font-size:13px;color:var(--text-secondary)">Select websites and keywords to scrape, or leave empty to use all.</div>
         </div>
         <button class="btn btn-primary" onclick="runScrape()" id="scrape-btn"><i class="ti ti-radar"></i> Start scraping</button>
       </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+        <div style="background:var(--surface-2);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <span style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Websites</span>
+            <span style="font-size:11px;color:var(--accent);cursor:pointer" onclick="toggleAll('websites')">Select all</span>
+          </div>
+          <div id="filter-websites" style="display:flex;flex-direction:column;gap:6px;max-height:150px;overflow-y:auto"></div>
+        </div>
+        <div style="background:var(--surface-2);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <span style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Keywords</span>
+            <span style="font-size:11px;color:var(--accent);cursor:pointer" onclick="toggleAll('keywords')">Select all</span>
+          </div>
+          <div id="filter-keywords" style="display:flex;flex-direction:column;gap:6px;max-height:150px;overflow-y:auto"></div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Leave all unchecked to scrape everything.</div>
       <div id="scrape-status" style="display:none;font-size:13px;color:var(--text-secondary);margin-bottom:16px;align-items:center;gap:8px"></div>
       <div id="scrape-results" style="display:none">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -288,6 +305,7 @@ function showPage(name, el) {
   if (name === 'websites') loadWebsites()
   if (name === 'keywords') loadKeywords()
   if (name === 'drafts') loadDrafts()
+  if (name === 'scrape') loadScrapeFilters()
   if (name === 'dashboard') loadDashboard()
 }
 
@@ -348,9 +366,7 @@ async function addWebsite() {
     document.getElementById('website-url').value = ''
     document.getElementById('website-name').value = ''
     loadWebsites()
-  } catch(e) {
-    showToast('Failed to add website')
-  }
+  } catch(e) { showToast('Failed to add website') }
 }
 
 async function deleteWebsite(id) {
@@ -420,7 +436,13 @@ async function runScrape() {
   results.style.display = 'none'
 
   try {
-    const res = await fetch(`${API}/agent/scrape`, { method: 'POST' })
+    const websiteIds = Array.from(document.querySelectorAll('#filter-websites input:checked')).map(o => parseInt(o.value))
+    const keywordIds = Array.from(document.querySelectorAll('#filter-keywords input:checked')).map(o => parseInt(o.value))
+    const res = await fetch(`${API}/agent/scrape`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ website_ids: websiteIds, keyword_ids: keywordIds })
+    })
     scrapedArticles = await res.json()
 
     document.getElementById('scrape-count').textContent = `${scrapedArticles.length} articles found — select which to rewrite`
@@ -466,6 +488,66 @@ async function rewriteSelected() {
   }
 }
 
+async function loadScrapeFilters() {
+  try {
+    const [websites, keywords] = await Promise.all([
+      fetch(`${API}/websites`).then(r => r.json()),
+      fetch(`${API}/keywords`).then(r => r.json())
+    ])
+    document.getElementById('filter-websites').innerHTML = websites.map(w => `
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 8px;border-radius:6px" onmouseover="this.style.background='var(--surface-1)'" onmouseout="this.style.background='transparent'">
+        <input type="checkbox" value="${w.id}" style="accent-color:var(--accent);width:14px;height:14px;flex-shrink:0">
+        <span style="font-size:13px;color:var(--text-primary)">${w.name || w.url}</span>
+      </label>`).join('')
+    document.getElementById('filter-keywords').innerHTML = keywords.map(k => `
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 8px;border-radius:6px" onmouseover="this.style.background='var(--surface-1)'" onmouseout="this.style.background='transparent'">
+        <input type="checkbox" value="${k.id}" style="accent-color:var(--accent);width:14px;height:14px;flex-shrink:0">
+        <span style="font-size:13px;color:var(--text-primary)">${k.word}${k.category ? '<span style="color:var(--text-muted);font-size:11px"> — '+k.category+'</span>' : ''}</span>
+      </label>`).join('')
+  } catch(e) { showToast('Failed to load filter options') }
+}
+
+function toggleAll(type) {
+  const container = document.getElementById('filter-' + type)
+  const boxes = container.querySelectorAll('input[type="checkbox"]')
+  const allChecked = Array.from(boxes).every(b => b.checked)
+  boxes.forEach(b => b.checked = !allChecked)
+}
+
+function showToast(message, type = 'error') {
+  const toast = document.createElement('div')
+  toast.style.cssText = `position:fixed;bottom:24px;right:24px;padding:12px 18px;border-radius:var(--radius);font-size:13px;color:#fff;background:${type === 'error' ? '#e24b4a' : '#3B6D11'};z-index:9999;transition:opacity .3s`
+  toast.textContent = message
+  document.body.appendChild(toast)
+  setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300) }, 3000)
+}
+
+async function copyDraft() {
+  await navigator.clipboard.writeText(easyMDE.value())
+  const btn = document.querySelector('[onclick="copyDraft()"]')
+  const orig = btn.innerHTML
+  btn.innerHTML = '<i class="ti ti-circle-check"></i> Copied!'
+  setTimeout(() => btn.innerHTML = orig, 1500)
+}
+
+async function checkFlaskStatus() {
+  const dot = document.querySelector('.status-dot')
+  const text = document.querySelector('.status-text')
+  try {
+    await fetch(`${API}/websites`)
+    dot.style.background = '#3B6D11'
+    text.textContent = 'Flask running on :5000'
+  } catch(e) {
+    dot.style.background = '#e24b4a'
+    text.textContent = 'Flask offline'
+  }
+}
+
+checkFlaskStatus()
+setInterval(checkFlaskStatus, 30000)
+
+loadDashboard()
+
 let currentDraftId = null
 let easyMDE = null
 
@@ -508,39 +590,6 @@ async function saveDraft() {
     setTimeout(() => btn.innerHTML = orig, 1500)
   }
 }
-async function copyDraft() {
-  await navigator.clipboard.writeText(easyMDE.value())
-  const btn = document.querySelector('[onclick="copyDraft()"]')
-  const orig = btn.innerHTML
-  btn.innerHTML = '<i class="ti ti-circle-check"></i> Copied!'
-  setTimeout(() => btn.innerHTML = orig, 1500)
-}
-
-function showToast(message, type = 'error') {
-  const toast = document.createElement('div')
-  toast.style.cssText = `position:fixed;bottom:24px;right:24px;padding:12px 18px;border-radius:var(--radius);font-size:13px;color:#fff;background:${type === 'error' ? '#e24b4a' : '#3B6D11'};z-index:9999;transition:opacity .3s`
-  toast.textContent = message
-  document.body.appendChild(toast)
-  setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300) }, 3000)
-}
-
-async function checkFlaskStatus() {
-  const dot = document.querySelector('.status-dot')
-  const text = document.querySelector('.status-text')
-  try {
-    await fetch(`${API}/websites`)
-    dot.style.background = '#3B6D11'
-    text.textContent = 'Flask running on :5000'
-  } catch(e) {
-    dot.style.background = '#e24b4a'
-    text.textContent = 'Flask offline'
-  }
-}
-
-checkFlaskStatus()
-setInterval(checkFlaskStatus, 30000)
-
-loadDashboard()
 </script>
 <script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
 </body>
