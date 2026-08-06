@@ -12,7 +12,8 @@ from langchain_openai import ChatOpenAI
 from ..models.keyword import Keyword
 from ..models.website import Website
 
-from firecrawl import FirecrawlApp
+from crawl4ai import AsyncWebCrawler
+import asyncio
 
 class ArticleState(TypedDict):
     url: str
@@ -40,34 +41,29 @@ def fetch_websites_and_keywords(state: ScraperState):
 
 
 def crawl_blog_index(state: ScraperState) -> ScraperState:
-    firecrawl = FirecrawlApp(api_key=os.getenv("FIRECRAWL_API_KEY"))
-    all_urls = []
-    for website in state["websites"]:
-        try:
-            result = firecrawl.crawl_url(
-                website,
-                limit=5,
-                scrape_options={"formats": ["markdown"]}
-            )
-            # result is a CrawlJob object — access .data
-            pages = result.data if hasattr(result, 'data') else result.get("data", [])
-            urls = [
-                page_url for page_url in urls
-                if any(segment in page_url for segment in ['/2024/', '/2025/', '/2026/', '/posts/', '/blog/'])
-                    and 'sitemap' not in page_url
-                    and '/tag/' not in page_url
-            ]
-            for page in pages:
-                meta = page.metadata if hasattr(page, 'metadata') else page.get("metadata", {})
-                url = meta.get("sourceURL") if isinstance(meta, dict) else getattr(meta, 'source_url', None)
-                if url:
-                    urls.append(url)
-            print(f"[DEBUG] URLs found for {website}: {urls}")
-            all_urls.extend(urls)
-            time.sleep(2)  # respect rate limit
-        except Exception as e:
-            print(f"[WARN] Failed to crawl {website}: {e}")
-    return {"pending_urls": list(set(all_urls))}
+    async def _crawl():
+        all_urls = []
+        async with AsyncWebCrawler() as crawler:
+            for website in state["websites"]:
+                try:
+                    result = await crawler.arun(url=website)
+                    # Extract links from the page
+                    links = result.links.get("internal", [])
+                    urls = [
+                        link["href"] for link in links
+                        if link.get("href") and
+                        any(seg in link["href"] for seg in ['/2024/', '/2025/', '/2026/', '/posts/', '/blog/']) and
+                        'sitemap' not in link["href"] and
+                        '/tag/' not in link["href"]
+                    ][:5]  # limit to 5 per site
+                    print(f"[DEBUG] URLs found for {website}: {urls}")
+                    all_urls.extend(urls)
+                except Exception as e:
+                    print(f"[WARN] Failed to crawl {website}: {e}")
+        return list(set(all_urls))
+
+    urls = asyncio.run(_crawl())
+    return {"pending_urls": urls}
 
 def check_dedup(state: ScraperState) -> ScraperState:
     pending = [url for url in state["pending_urls"] if url not in state["scraped_urls"]]
@@ -80,16 +76,17 @@ def scrape_article(state: ScraperState) -> ScraperState:
             "current_article": {"url": "", "text": "", "source_site": "", "matched_keywords": [], "summary": ""}
         }
 
-    firecrawl = FirecrawlApp(api_key=os.getenv("FIRECRAWL_API_KEY"))
+    async def _scrape(url):
+        async with AsyncWebCrawler() as crawler:
+            result = await crawler.arun(url=url)
+            return result.markdown or ""
+
     url = state["pending_urls"][0]
     remaining = state["pending_urls"][1:]
 
     try:
-        result = firecrawl.scrape_url(url, formats=["markdown"])
-        # result is a Document object — access attribute directly
-        text = getattr(result, 'markdown', None) or ""
+        text = asyncio.run(_scrape(url))
         source_site = url.split("/")[2]
-        time.sleep(6)  # 10 req/min = 1 every 6s
     except Exception as e:
         print(f"[WARN] Failed to scrape {url}: {e}")
         text = ""
