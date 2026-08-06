@@ -33,12 +33,11 @@ class ScraperState(TypedDict):
 
 
 def fetch_websites_and_keywords(state: ScraperState):
-    websites = [w.url for w in Website.query.all()]
-    keywords = [k.word for k in Keyword.query.all()]
-
+    websites = state.get("websites") or [w.url for w in Website.query.all()]
+    keywords = state.get("keywords") or [k.word for k in Keyword.query.all()]
     return {
-        'websites': websites,
-        'keywords': keywords,
+        "websites": websites,
+        "keywords": keywords
     }
 
 def crawl_blog_index(state: ScraperState):
