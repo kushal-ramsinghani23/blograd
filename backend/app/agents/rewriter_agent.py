@@ -7,6 +7,10 @@ from langgraph.graph import StateGraph
 from ..models.draft import Draft
 from ..extensions import db
 
+from langchain_core.tools import tool
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
+
 import os
 os.makedirs("static/images", exist_ok=True)
 
@@ -116,38 +120,58 @@ def rewrite_article(state: RewriterState) -> RewriterState:
         "current_rewritten": rewritten
     }
 
-def generate_image(state: RewriterState):
-    title = state["current_rewritten"]["title"]
-    image_path = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRb2tMNE2CYAKICIRNU8W_KA1x4rbz1q9obBg&s"
-
+@tool
+def generate_image_tool(title: str) -> str:
+    """Generate a hero image for a blog post given its title.
+    Only call this if the article topic is visual, concrete, or product-related.
+    Skip for abstract, opinion, or policy articles."""
     try:
         client = genai.Client()
         response = client.models.generate_content(
             model="gemini-3.1-flash-image-preview",
             contents=f"Blog hero image for: {title}"
         )
-
         filename = title.lower().replace(" ", "_")[:50]
-        generated_path = f"static/images/{filename}.png"
-
+        image_path = f"static/images/{filename}.png"
         for part in response.parts:
             if part.inline_data is not None:
                 image = part.as_image()
-                image.save(generated_path)
-                image_path = generated_path
-                break
-
+                image.save(image_path)
+                return image_path
+        return "static/images/default.png"
     except Exception as e:
-        print(f"Image generation failed: {e}, using default image")
+        print(f"[WARN] Image generation failed: {e}")
+        return "static/images/default.png"
+
+def agent_node(state: RewriterState) -> RewriterState:
+    rewritten = state["current_rewritten"]
+    tools = [generate_image_tool]
+    llm = ChatGroq(model="llama-3.3-70b-versatile").bind_tools(tools)
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", """You are a blog post finisher. You have a rewritten article.
+        Decide whether to generate a hero image based on the article title and content.
+        Generate an image ONLY if the topic is visual, concrete, or product-related.
+        SKIP image generation for abstract, opinion, or policy articles.
+        After deciding, return the image path or 'static/images/default.png'."""),
+        ("human", f"Article title: {rewritten['title']}\nContent preview: {rewritten['content'][:200]}")
+    ])
+
+    chain = prompt | llm
+    response = chain.invoke({})
+
+    image_path = "static/images/default.png"
+    if response.tool_calls:
+        for tool_call in response.tool_calls:
+            if tool_call["name"] == "generate_image_tool":
+                image_path = generate_image_tool.invoke(tool_call["args"])
 
     updated_rewritten = {
-        **state["current_rewritten"],
+        **rewritten,
         "featured_image_url": image_path
     }
 
-    return {
-        "current_rewritten": updated_rewritten
-    }
+    return {"current_rewritten": updated_rewritten}
 
 def save_draft(state: RewriterState):
     rewritten = state["current_rewritten"]
@@ -177,7 +201,7 @@ def create_rewriter_graph():
     builder = StateGraph(RewriterState)
 
     builder.add_node("rewrite_article", rewrite_article)
-    builder.add_node("generate_image", generate_image)
+    builder.add_node("generate_image", agent_node)
     builder.add_node("save_draft", save_draft)
 
     builder.add_edge(START, "rewrite_article")
